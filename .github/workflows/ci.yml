@@ -1,0 +1,50 @@
+name: LabWork5 CI
+
+on:
+  push:
+    branches:
+      - LabWork5
+  pull_request:
+    branches:
+      - main
+      - LabWork5
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Build Docker images
+        run: docker compose build
+
+      - name: Start containers
+        run: docker compose up -d
+
+      - name: Wait for backend health
+        run: |
+          for i in {1..20}; do
+            if curl -fsS http://localhost:8000/health; then
+              echo "Backend is healthy"
+              exit 0
+            fi
+            echo "Waiting for backend..."
+            sleep 5
+          done
+          echo "Backend health check failed"
+          docker compose logs
+          exit 1
+
+      - name: Show container status
+        run: docker compose ps
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v

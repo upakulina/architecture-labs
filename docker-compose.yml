@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gradebook_db
+    environment:
+      POSTGRES_DB: gradebook_db
+      POSTGRES_USER: gradebook_user
+      POSTGRES_PASSWORD: gradebook_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - gradebook_pgdata:/var/lib/postgresql/data
+      - ./LabWork5/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gradebook_user -d gradebook_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./LabWork5/src/backend
+    container_name: gradebook_backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: gradebook_db
+      DB_USER: gradebook_user
+      DB_PASSWORD: gradebook_password
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./LabWork5/src/frontend
+    container_name: gradebook_frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  gradebook_pgdata:
