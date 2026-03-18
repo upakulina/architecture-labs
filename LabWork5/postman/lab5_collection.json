@@ -1,0 +1,427 @@
+{
+  "info": {
+    "_postman_id": "5847c417-7cb4-44b5-87ef-959791ba0f2e",
+    "name": "LabWork5 API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "35949591",
+    "_collection_link": "https://go.postman.co/collection/35949591-5847c417-7cb4-44b5-87ef-959791ba0f2e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "GET Health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response contains status ok\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.status).to.eql(\"ok\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "GET Gradebooks",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response is an array\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(Array.isArray(json)).to.eql(true);",
+              "});",
+              "",
+              "pm.test(\"Gradebooks list is not empty\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.length).to.be.above(0);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/gradebooks",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "gradebooks"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "OPEN",
+              "disabled": true
+            },
+            {
+              "key": "semester",
+              "value": "2025S",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "20",
+              "disabled": true
+            },
+            {
+              "key": "offset",
+              "value": "0",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "-createdAt",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gradebooks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gradebooks"
+              ]
+            }
+          },
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": "{\n  \"items\": [\n    {\n      \"id\": \"100001\",\n      \"discipline\": { \"id\": \"200001\", \"name\": \"Базы данных\" },\n      \"group\": { \"id\": \"ris223\", \"name\": \"РИС-22-3\" },\n      \"semester\": \"2025S\",\n      \"status\": \"OPEN\",\n      \"createdAt\": \"2026-02-22T12:30:00Z\"\n    }\n  ],\n  \"paging\": { \"limit\": 20, \"offset\": 0, \"total\": 1 }\n}"
+        },
+        {
+          "name": "200 OK (empty list)",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gradebooks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gradebooks"
+              ]
+            }
+          },
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": "{\n  \"items\": [],\n  \"paging\": { \"limit\": 20, \"offset\": 0, \"total\": 0 }\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET Gradebook by id",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response contains gradebook and grades\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property(\"gradebook\");",
+              "    pm.expect(json).to.have.property(\"grades\");",
+              "    pm.expect(json.gradebook.id).to.eql(1);",
+              "    pm.expect(Array.isArray(json.grades)).to.eql(true);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/gradebooks/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "gradebooks",
+            "1"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gradebooks/100001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gradebooks",
+                "100001"
+              ]
+            }
+          },
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": "{\n  \"id\": \"100001\",\n  \"discipline\": { \"id\": \"200001\", \"name\": \"Базы данных\" },\n  \"group\": { \"id\": \"ris223\", \"name\": \"РИС-22-3\" },\n  \"semester\": \"2025S\",\n  \"status\": \"OPEN\",\n  \"createdAt\": \"2026-02-22T12:30:00Z\"\n}"
+        },
+        {
+          "name": "404 Not Found",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gradebooks/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gradebooks",
+                "999999"
+              ]
+            }
+          },
+          "code": 404,
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": "{\n  \"error\": {\n    \"code\": \"GRADEBOOK_NOT_FOUND\",\n    \"message\": \"Gradebook not found.\",\n    \"details\": { \"gradebookId\": \"999999\" }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "POST Grades",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Created grade belongs to gradebook 1\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.gradebook_id).to.eql(1);",
+              "});",
+              "",
+              "pm.test(\"Created grade contains expected score\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(Number(json.score)).to.eql(9.5);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"student_name\": \"Сидорова Мария\",\n  \"control_name\": \"Лабораторная работа 2\",\n  \"score\": 9.5\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/gradebooks/1/grades",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "gradebooks",
+            "1",
+            "grades"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"300001\",\n  \"assessmentItemId\": \"400001\",\n  \"points\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gradebooks/100000/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gradebooks",
+                "100000",
+                "grades"
+              ]
+            }
+          },
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": "{\n  \"gradebookId\": \"100000\",\n  \"studentId\": \"300001\",\n  \"total\": 8,\n  \"status\": \"AtRisk\",\n  \"updatedAt\": \"2026-02-22T12:40:00Z\"\n}"
+        },
+        {
+          "name": "422 Unprocessable Entity (points out of range)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"300001\",\n  \"assessmentItemId\": \"400001\",\n  \"points\": 99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gradebooks/100001/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gradebooks",
+                "100001",
+                "grades"
+              ]
+            }
+          },
+          "code": 422,
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": "{\n  \"error\": {\n    \"code\": \"POINTS_OUT_OF_RANGE\",\n    \"message\": \"Points must be between 0 and maxPoints.\",\n    \"details\": { \"assessmentItemId\": \"400001\", \"maxPoints\": 10, \"points\": 99 }\n  }\n}"
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": ""
+    }
+  ]
+}
