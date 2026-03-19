@@ -14,6 +14,10 @@
 
 Контейнеры запускаются через `docker compose` и взаимодействуют друг с другом по внутренней сети Docker.
 
+Запуск контейнера: `docker compose up --build -d`
+
+Демонстрация запуска: `docker compose ps`
+
 Общая схема взаимодействия:
 
 `frontend → backend → db`
@@ -110,8 +114,6 @@ docker compose up --build
 - `gradebook_backend`
 - `gradebook_db`
 
-![Рисунок 1 — Состояние контейнеров после запуска](images/lab5-containers.png)
-
 ## Проверка работоспособности
 
 ### Проверка backend
@@ -128,25 +130,17 @@ curl http://localhost:8000/health
 {"status":"ok"}
 ```
 
-![Рисунок 2 — Проверка доступности backend](images/lab5-health.png)
-
 ### Проверка Swagger UI
 
 Swagger-документация backend доступна по адресу:
 
 `http://localhost:8000/docs`
 
-![Рисунок 3 — Swagger UI реализованного API](images/lab5-swagger.png)
-
 ### Проверка frontend
 
 После открытия страницы `http://localhost:8080` через интерфейс были успешно выполнены действия:
 - получение списка ведомостей;
 - добавление новой оценки в ведомость.
-
-![Рисунок 4 — Клиентская часть системы](images/lab5-frontend.png)
-
-![Рисунок 5 — Получение списка ведомостей и добавление оценки](images/lab5-frontend-actions.png)
 
 ## Непрерывная интеграция (CI)
 
@@ -176,8 +170,6 @@ Swagger-документация backend доступна по адресу:
 - `Show container status`
 - `Stop containers`
 
-![Рисунок 6 — Успешное выполнение GitHub Actions workflow](images/lab5-actions-success.png)
-
 ## 7. Интеграционные тесты
 
 Интеграционные тесты реализованы в виде Postman-коллекции:
@@ -199,5 +191,3 @@ LabWork5/postman/lab5_collection.json
 ```bash
 newman run LabWork5/postman/lab5_collection.json --env-var baseUrl=http://localhost:8000
 ```
-
-![Рисунок 7 — Успешный запуск Postman/Newman тестов в CI](images/lab5-newman.png)
