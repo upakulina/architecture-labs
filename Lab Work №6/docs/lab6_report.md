@@ -516,4 +516,297 @@ public class GradebookReaderProxy : IGradebookReader
 **Результат применения:** Прокси позволяет централизованно контролировать доступ к данным ведомостей. Основной сервис чтения остается простым, а проверка прав выносится в отдельный слой.
 
 ### Поведенческие шаблоны
-<Представить с пояснения по каждому шаблону, указав: название, общее назначение и назначение согласно реализуемому функционалу, сопроводив UML-диаграммой и соответствующим фрагментом программного кода>
+
+### Strategy (Стратегия)
+
+**Общее назначение:** Шаблон Strategy определяет семейство алгоритмов, инкапсулирует каждый из них и делает их взаимозаменяемыми. Это позволяет изменять алгоритм независимо от клиента, который его использует.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей итоговая оценка может рассчитываться по разным правилам в зависимости от дисциплины. Например, для одной дисциплины используется взвешенная сумма, а для другой — простое среднее. Шаблон Strategy позволяет выделить разные алгоритмы расчета в отдельные классы и переключать их без изменения основного сервиса.
+
+**UML-диаграмма**
+![Strategy](./strategy.png)
+
+**Пример кода**
+```csharp
+public class GradeItem
+{
+    public decimal Score { get; set; }
+    public decimal Weight { get; set; }
+}
+
+public interface IFinalScoreStrategy
+{
+    decimal Calculate(IReadOnlyCollection<GradeItem> items);
+}
+
+public class WeightedScoreStrategy : IFinalScoreStrategy
+{
+    public decimal Calculate(IReadOnlyCollection<GradeItem> items)
+    {
+        return items.Sum(x => x.Score * x.Weight);
+    }
+}
+
+public class AverageScoreStrategy : IFinalScoreStrategy
+{
+    public decimal Calculate(IReadOnlyCollection<GradeItem> items)
+    {
+        return items.Count == 0 ? 0 : items.Average(x => x.Score);
+    }
+}
+
+public class FinalScoreService
+{
+    private readonly IFinalScoreStrategy _strategy;
+
+    public FinalScoreService(IFinalScoreStrategy strategy)
+    {
+        _strategy = strategy;
+    }
+
+    public decimal CalculateResult(IReadOnlyCollection<GradeItem> items)
+    {
+        return _strategy.Calculate(items);
+    }
+}
+```
+
+**Результат применения:** Шаблон позволяет добавлять новые способы расчета итоговой оценки без изменения основного сервиса.
+
+### Command (Команда)
+
+**Общее назначение:** Шаблон Command инкапсулирует запрос в виде объекта, что позволяет параметризовать клиентов операциями, поддерживать логирование, очереди и откат действий.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей операция выставления оценки может быть оформлена как отдельная команда. Это удобно, так как команда может быть поставлена в очередь, записана в журнал, повторно выполнена или отменена.
+
+**UML-диаграмма**
+![Command](./command.png)
+
+**Пример кода**
+```csharp
+public class Grade
+{
+    public Guid Id { get; set; }
+    public Guid GradebookId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
+    public int Points { get; set; }
+}
+
+public interface IGradeRepository
+{
+    Task SaveAsync(Grade grade);
+}
+
+public interface ICommand
+{
+    Task ExecuteAsync();
+}
+
+public class SaveGradeCommand : ICommand
+{
+    private readonly IGradeRepository _repository;
+    private readonly Grade _grade;
+
+    public SaveGradeCommand(IGradeRepository repository, Grade grade)
+    {
+        _repository = repository;
+        _grade = grade;
+    }
+
+    public async Task ExecuteAsync()
+    {
+        await _repository.SaveAsync(_grade);
+    }
+}
+
+public class CommandInvoker
+{
+    public async Task RunAsync(ICommand command)
+    {
+        await command.ExecuteAsync();
+    }
+}
+```
+
+**Результат применения:** Команда изолирует действие сохранения оценки и делает вызов более гибким.
+
+### Observer (Наблюдатель)
+
+**Общее назначение:** Шаблон Observer определяет зависимость «один ко многим» между объектами. Когда состояние одного объекта изменяется, все зависимые объекты автоматически уведомляются.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей после изменения оценки может потребоваться выполнить несколько действий: записать аудит, обновить статистику, отправить уведомление. Шаблон Observer позволяет организовать это как набор подписчиков на событие изменения оценки.
+
+**UML-диаграмма**
+![Observer](./observer.png)
+
+**Пример кода**
+```csharp
+public class GradeChangedEvent
+{
+    public Guid GradebookId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
+    public int NewPoints { get; set; }
+}
+
+public interface IGradeObserver
+{
+    Task UpdateAsync(GradeChangedEvent gradeEvent);
+}
+
+public class AuditObserver : IGradeObserver
+{
+    public Task UpdateAsync(GradeChangedEvent gradeEvent)
+    {
+        Console.WriteLine($"Audit: {gradeEvent.StudentName} -> {gradeEvent.NewPoints}");
+        return Task.CompletedTask;
+    }
+}
+
+public class StatisticsObserver : IGradeObserver
+{
+    public Task UpdateAsync(GradeChangedEvent gradeEvent)
+    {
+        Console.WriteLine($"Statistics updated for gradebook {gradeEvent.GradebookId}");
+        return Task.CompletedTask;
+    }
+}
+
+public class GradeSubject
+{
+    private readonly List<IGradeObserver> _observers = new();
+
+    public void Attach(IGradeObserver observer)
+    {
+        _observers.Add(observer);
+    }
+
+    public async Task NotifyAsync(GradeChangedEvent gradeEvent)
+    {
+        foreach (var observer in _observers)
+        {
+            await observer.UpdateAsync(gradeEvent);
+        }
+    }
+}
+```
+
+**Результат применения:** Шаблон позволяет гибко добавлять новые реакции на изменение оценки без переписывания основного процесса.
+
+### Template Method (Шаблонный метод)
+
+**Общее назначение:** Шаблон Template Method определяет общий каркас алгоритма в базовом классе, позволяя подклассам переопределять отдельные шаги без изменения структуры алгоритма.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей процесс формирования отчета всегда проходит по общей схеме: загрузка данных, подготовка содержимого, экспорт. Однако конкретный формат может отличаться. Шаблон Template Method позволяет задать общую последовательность шагов и переопределить только формат вывода.
+
+**UML-диаграмма**
+![Template Method](./template_method.png)
+
+**Пример кода**
+```csharp
+public abstract class ReportGenerator
+{
+    public byte[] Generate(Guid gradebookId)
+    {
+        var data = LoadData(gradebookId);
+        var content = BuildContent(data);
+        return Export(content);
+    }
+
+    protected virtual string LoadData(Guid gradebookId)
+    {
+        return $"Data for gradebook {gradebookId}";
+    }
+
+    protected virtual string BuildContent(string data)
+    {
+        return $"Prepared content: {data}";
+    }
+
+    protected abstract byte[] Export(string content);
+}
+
+public class XlsxReportGenerator : ReportGenerator
+{
+    protected override byte[] Export(string content)
+    {
+        return System.Text.Encoding.UTF8.GetBytes($"XLSX: {content}");
+    }
+}
+
+public class CsvReportGenerator : ReportGenerator
+{
+    protected override byte[] Export(string content)
+    {
+        return System.Text.Encoding.UTF8.GetBytes($"CSV: {content}");
+    }
+}
+```
+
+**Результат применения:** Шаблон фиксирует структуру процесса генерации отчета и позволяет менять только отдельные шаги.
+
+### State (Состояние)
+
+**Общее назначение:** Шаблон State позволяет объекту изменять свое поведение в зависимости от внутреннего состояния. Внешне это выглядит как изменение класса объекта.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей ведомость может находиться, например, в состояниях: открыта, закрыта, архивирована. Доступные действия зависят от текущего состояния. Шаблон State позволяет вынести поведение для каждого состояния в отдельные классы.
+
+**UML-диаграмма**
+![State](./state.png)
+
+**Пример кода**
+```csharp
+public interface IGradebookState
+{
+    void AddGrade(GradebookContext context);
+    void Close(GradebookContext context);
+}
+
+public class GradebookContext
+{
+    public IGradebookState State { get; set; }
+
+    public GradebookContext(IGradebookState state)
+    {
+        State = state;
+    }
+
+    public void AddGrade()
+    {
+        State.AddGrade(this);
+    }
+
+    public void Close()
+    {
+        State.Close(this);
+    }
+}
+
+public class OpenState : IGradebookState
+{
+    public void AddGrade(GradebookContext context)
+    {
+        Console.WriteLine("Grade added.");
+    }
+
+    public void Close(GradebookContext context)
+    {
+        Console.WriteLine("Gradebook closed.");
+        context.State = new ClosedState();
+    }
+}
+
+public class ClosedState : IGradebookState
+{
+    public void AddGrade(GradebookContext context)
+    {
+        throw new InvalidOperationException("Cannot add grade to closed gradebook.");
+    }
+
+    public void Close(GradebookContext context)
+    {
+        Console.WriteLine("Gradebook is already closed.");
+    }
+}
+```
+
+**Результат применения:** Шаблон позволяет явно описать правила работы с ведомостью в зависимости от ее текущего статуса.
