@@ -140,6 +140,12 @@ Header: `Location: /api/v1/gradebooks/{gradebookId}`
 
 **Path-параметр:** `gradebookId` — UUID
 
+**Query-параметры:**
+- `includeItems` — `true | false` — включать ли элементы контроля в ответ
+- `includeGrades` — `true | false` — включать ли оценки студентов
+- `includeAttendance` — `true | false` — включать ли данные по посещаемости
+- `includeStats` — `true | false` — включать ли агрегированную статистику по ведомости
+
 **Ответ 200 (JSON):**
 ```
 {
@@ -161,6 +167,13 @@ Header: `Location: /api/v1/gradebooks/{gradebookId}`
 **URL:** `/api/v1/gradebooks/{gradebookId}/assessment-items`
 
 **Path-параметры:** `gradebookId` — UUID
+
+**Query-параметры:**
+
+- `title` — фильтр по названию элемента контроля
+- `sort` — строка, например title, -title, weight, -weight
+- `limit` — ограничение количества записей
+- `offset` — смещение для пагинации
 
 **Ответ 200 (JSON):**
 ```
@@ -211,7 +224,13 @@ Header: `Location: /api/v1/gradebooks/{gradebookId}`
 
 **URL:** `/api/v1/gradebooks/{gradebookId}/grades`
 
-**Query-параметр (опционально):** `studentId` — UUID (если указан, отдаём оценки одного студента)
+**Query-параметры:**
+- `studentId` — UUID — фильтр по студенту
+- `assessmentItemId` — UUID — фильтр по конкретному элементу контроля
+- `updatedAfter` — дата/время в ISO 8601 — вернуть только оценки, изменённые после указанного момента
+- `limit` — ограничение количества записей
+- `offset` — смещение для пагинации
+- `sort` — строка, например updatedAt, -updatedAt, points, -points
 
 **Пример:** `GET /api/v1/gradebooks/{gradebookId}/grades?studentId=57586896`
 
