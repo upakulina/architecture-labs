@@ -271,7 +271,249 @@ public class GradebookReportDirector
 **Результат применения:** шаблон Builder делает построение сложного объекта отчета управляемым и расширяемым. Можно легко создавать разные типы отчетов: полный, краткий, только по оценкам, только по посещаемости и т.д.
 
 ### Структурные шаблоны
-<Представить с пояснения по каждому шаблону, указав: название, общее назначение и назначение согласно реализуемому функционалу, сопроводив UML-диаграммой и соответствующим фрагментом программного кода>
+
+### Adapter (Адаптер)
+
+**Общее назначение:** Шаблон Adapter преобразует интерфейс одного класса в другой интерфейс, ожидаемый клиентом. Он используется, когда необходимо обеспечить совместную работу классов с несовместимыми интерфейсами.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей серверная часть интегрируется с внешними сервисами университета, например с системой расписания. Внешняя система может возвращать данные в формате, неудобном для внутреннего кода приложения.  
+Адаптер позволяет преобразовать внешний интерфейс в единый внутренний интерфейс, используемый в системе.
+
+**UML-диаграмма**
+![Adapter](./adapter.png)
+
+**Пример кода**
+
+```csharp
+public class ExternalScheduleApiClient
+{
+    public List<string> LoadLessons(string groupCode)
+    {
+        return new List<string>
+        {
+            "2026-03-01|Math",
+            "2026-03-03|Architecture"
+        };
+    }
+}
+
+public interface IScheduleProvider
+{
+    IReadOnlyCollection<LessonDto> GetLessons(string groupCode);
+}
+
+public class LessonDto
+{
+    public DateTime Date { get; set; }
+    public string Subject { get; set; } = string.Empty;
+}
+
+public class ScheduleAdapter : IScheduleProvider
+{
+    private readonly ExternalScheduleApiClient _externalClient;
+
+    public ScheduleAdapter(ExternalScheduleApiClient externalClient)
+    {
+        _externalClient = externalClient;
+    }
+
+    public IReadOnlyCollection<LessonDto> GetLessons(string groupCode)
+    {
+        var rawLessons = _externalClient.LoadLessons(groupCode);
+
+        return rawLessons
+            .Select(x => x.Split('|'))
+            .Select(parts => new LessonDto
+            {
+                Date = DateTime.Parse(parts[0]),
+                Subject = parts[1]
+            })
+            .ToList();
+    }
+}
+```
+
+**Результат применения:** Использование адаптера позволяет не зависеть от формата данных внешней системы. Внутренние компоненты работают с единым интерфейсом `IScheduleProvider`, а детали интеграции изолированы в адаптере.
+
+### Facade
+
+**Общее назначение:** Шаблон Facade предоставляет единый упрощенный интерфейс к сложной подсистеме. Он уменьшает связанность клиента с внутренними компонентами и скрывает детали их взаимодействия.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей формирование итогового отчета по дисциплине может включать несколько действий: загрузку ведомости, получение оценок, получение посещаемости, расчет статистики и экспорт результата. Фасад позволяет предоставить единый сервис формирования отчета, не заставляя клиента обращаться к каждому внутреннему компоненту отдельно.
+
+**UML-диаграмма**
+![Facade](./facade.png)
+
+**Пример кода**
+```csharp
+public interface IGradebookRepository
+{
+    string GetGradebookTitle(Guid gradebookId);
+}
+
+public interface IGradesRepository
+{
+    IReadOnlyCollection<int> GetGrades(Guid gradebookId);
+}
+
+public interface IAttendanceRepository
+{
+    IReadOnlyCollection<int> GetAttendance(Guid gradebookId);
+}
+
+public interface IStatisticsService
+{
+    string BuildStatistics(IReadOnlyCollection<int> grades, IReadOnlyCollection<int> attendance);
+}
+
+public interface IReportExporter
+{
+    byte[] Export(string title, IReadOnlyCollection<int> grades, IReadOnlyCollection<int> attendance, string statistics);
+}
+
+public class ReportFacade
+{
+    private readonly IGradebookRepository _gradebookRepository;
+    private readonly IGradesRepository _gradesRepository;
+    private readonly IAttendanceRepository _attendanceRepository;
+    private readonly IStatisticsService _statisticsService;
+    private readonly IReportExporter _reportExporter;
+
+    public ReportFacade(
+        IGradebookRepository gradebookRepository,
+        IGradesRepository gradesRepository,
+        IAttendanceRepository attendanceRepository,
+        IStatisticsService statisticsService,
+        IReportExporter reportExporter)
+    {
+        _gradebookRepository = gradebookRepository;
+        _gradesRepository = gradesRepository;
+        _attendanceRepository = attendanceRepository;
+        _statisticsService = statisticsService;
+        _reportExporter = reportExporter;
+    }
+
+    public byte[] BuildGradebookReport(Guid gradebookId)
+    {
+        var title = _gradebookRepository.GetGradebookTitle(gradebookId);
+        var grades = _gradesRepository.GetGrades(gradebookId);
+        var attendance = _attendanceRepository.GetAttendance(gradebookId);
+        var statistics = _statisticsService.BuildStatistics(grades, attendance);
+
+        return _reportExporter.Export(title, grades, attendance, statistics);
+    }
+}
+```
+
+**Результат применения:** Фасад упрощает использование подсистемы отчетности. Клиент работает только с `ReportFacade`, а детали взаимодействия репозиториев, статистики и экспорта скрыты внутри.
+
+### Decorator (Декоратор)
+
+**Общее назначение:** Шаблон Decorator позволяет динамически добавлять объекту новые обязанности, не изменяя его исходный класс. Это гибкая альтернатива наследованию для расширения поведения.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей при сохранении оценки может потребоваться не только запись в базу данных, но и дополнительное логирование.  Декоратор позволяет обернуть основной сервис сохранения оценки дополнительной функциональностью, например аудитом или логированием, не изменяя основной класс.
+
+**UML-диаграмма**
+![Decorator](./decorator.png)
+
+**Пример кода**
+```csharp
+public class Grade
+{
+    public Guid Id { get; set; }
+    public Guid GradebookId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
+    public int Points { get; set; }
+}
+
+public interface IGradeService
+{
+    Task SaveAsync(Grade grade);
+}
+
+public class GradeService : IGradeService
+{
+    public Task SaveAsync(Grade grade)
+    {
+        Console.WriteLine($"Saved grade for {grade.StudentName}");
+        return Task.CompletedTask;
+    }
+}
+
+public class LoggingGradeServiceDecorator : IGradeService
+{
+    private readonly IGradeService _inner;
+
+    public LoggingGradeServiceDecorator(IGradeService inner)
+    {
+        _inner = inner;
+    }
+
+    public async Task SaveAsync(Grade grade)
+    {
+        Console.WriteLine($"[LOG] Saving grade {grade.Id}...");
+        await _inner.SaveAsync(grade);
+        Console.WriteLine($"[LOG] Grade {grade.Id} saved.");
+    }
+}
+```
+
+**Результат применения:** Декоратор позволяет расширять сервис без изменения базовой реализации. При необходимости можно добавлять другие декораторы: аудит, кэширование, метрики, уведомления.
+
+### Proxy (Заместитель)**
+
+**Общее назначение:** Шаблон Proxy предоставляет объект-заместитель, который контролирует доступ к другому объекту. Он может использоваться для ленивой загрузки, кеширования, контроля прав доступа и других задач.
+
+**Назначение в рамках проекта:** В системе рабочих ведомостей доступ к данным конкретной ведомости должен зависеть от роли пользователя. Например, преподаватель может работать только со своими дисциплинами. Прокси позволяет добавить проверку прав доступа перед обращением к реальному сервису чтения ведомости.
+
+**UML-диаграмма**
+![Proxy](./proxy.png)
+
+**Пример кода**
+```csharp
+public interface IGradebookReader
+{
+    string GetById(Guid gradebookId);
+}
+
+public class GradebookReader : IGradebookReader
+{
+    public string GetById(Guid gradebookId)
+    {
+        return $"Gradebook {gradebookId}";
+    }
+}
+
+public interface IUserContext
+{
+    string Role { get; }
+    bool HasAccessToGradebook(Guid gradebookId);
+}
+
+public class GradebookReaderProxy : IGradebookReader
+{
+    private readonly IGradebookReader _inner;
+    private readonly IUserContext _userContext;
+
+    public GradebookReaderProxy(IGradebookReader inner, IUserContext userContext)
+    {
+        _inner = inner;
+        _userContext = userContext;
+    }
+
+    public string GetById(Guid gradebookId)
+    {
+        if (!_userContext.HasAccessToGradebook(gradebookId))
+        {
+            throw new UnauthorizedAccessException("Access denied to selected gradebook.");
+        }
+
+        return _inner.GetById(gradebookId);
+    }
+}
+```
+
+**Результат применения:** Прокси позволяет централизованно контролировать доступ к данным ведомостей. Основной сервис чтения остается простым, а проверка прав выносится в отдельный слой.
 
 ### Поведенческие шаблоны
 <Представить с пояснения по каждому шаблону, указав: название, общее назначение и назначение согласно реализуемому функционалу, сопроводив UML-диаграммой и соответствующим фрагментом программного кода>
