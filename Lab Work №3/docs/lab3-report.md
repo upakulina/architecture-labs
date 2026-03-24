@@ -11,7 +11,7 @@
 
 ## Диаграмма компонентов
 
-![Диаграмма компонентов](./component_diagram_1.png)
+![Диаграмма компонентов](./component_diagram_2.png)
 
 ## Диаграмма последовательностей
 ![Диаграмма последовательностей](./usecase_diagram.png)
@@ -91,44 +91,229 @@ export async function apiPost<TReq, TRes>(url: string, body: TReq): Promise<TRes
 ### SOLID
 SOLID — набор принципов, которые делают код расширяемым и поддерживаемым. Ключевая идея — разделение ответственности и зависимости от абстракций. 
 
-**Серверный код:**
-``` csharp
-public sealed class GradebookService
+**S — Single Responsibility Principle**
+
+Принцип единственной ответственности означает, что каждый класс должен отвечать только за одну задачу.  
+В сценарии выставления оценки это удобно разделить на три отдельные обязанности:
+- сохранение оценки;
+- пересчет итоговой оценки;
+- запись аудита изменений.
+
+```csharp
+public class GradeService
 {
-    private readonly IGradeRepository _repo;
-    private readonly IEvaluationEngine _eval;
+    private readonly IGradeRepository _gradeRepository;
 
-    public GradebookService(IGradeRepository repo, IEvaluationEngine eval)
+    public GradeService(IGradeRepository gradeRepository)
     {
-        _repo = repo;
-        _eval = eval;
+        _gradeRepository = gradeRepository;
     }
 
-    public async Task<GradeResultDto> UpsertAndRecalculateAsync(Guid gradebookId, UpsertGradeRequest req, CancellationToken ct)
+    public async Task SaveGradeAsync(Grade grade)
     {
-        await _repo.UpsertGradeAsync(gradebookId, req.StudentId, req.AssessmentItemId, req.Points, ct);
-        var grades = await _repo.GetGradesForStudentAsync(gradebookId, req.StudentId, ct);
-        return _eval.Recalculate(gradebookId, req.StudentId, grades);
+        await _gradeRepository.SaveAsync(grade);
+    }
+}
+
+public class FinalScoreCalculator
+{
+    public decimal Calculate(decimal currentScore, decimal examScore)
+    {
+        return currentScore * 0.6m + examScore * 0.4m;
+    }
+}
+
+public class AuditService
+{
+    private readonly IAuditRepository _auditRepository;
+
+    public AuditService(IAuditRepository auditRepository)
+    {
+        _auditRepository = auditRepository;
+    }
+
+    public async Task WriteRecordAsync(string userId, string action, string entityId)
+    {
+        await _auditRepository.SaveAsync(userId, action, entityId, DateTime.UtcNow);
     }
 }
 ```
-В этом фрагменте сервис не знает, как именно хранятся оценки (это скрыто за IGradeRepository), и не содержит алгоритм расчёта итогов (это IEvaluationEngine), поэтому реализацию репозитория или расчёта можно заменить без переписывания сервиса, а обязанности не смешиваются в одном классе.
 
-**Клиентский код:**
-``` typescript
-export interface IGradeApi {
-  upsertGrade(gradebookId: string, req: UpsertGradeRequest): Promise<GradeResultDto>;
+Здесь каждый класс выполняет только одну функцию, поэтому код проще поддерживать и изменять.
+
+**O — Open/Closed Principle**
+
+Принцип открытости/закрытости означает, что систему можно расширять без изменения уже работающего кода.  
+Для системы ведомостей это удобно при добавлении новых правил расчета итоговой оценки.
+
+```csharp
+public interface IEvaluationStrategy
+{
+    decimal Calculate(IReadOnlyCollection<GradeItem> items);
 }
 
-export class GradeApi implements IGradeApi {
-  async upsertGrade(gradebookId: string, req: UpsertGradeRequest): Promise<GradeResultDto> {
-    return apiPost<UpsertGradeRequest, GradeResultDto>(`/api/gradebooks/${gradebookId}/grades`, req);
-  }
+public class WeightedEvaluationStrategy : IEvaluationStrategy
+{
+    public decimal Calculate(IReadOnlyCollection<GradeItem> items)
+    {
+        return items.Sum(x => x.Score * x.Weight);
+    }
 }
 
-export type GradeResultDto = { studentId: string; totalPoints: number; status: string };
+public class AverageEvaluationStrategy : IEvaluationStrategy
+{
+    public decimal Calculate(IReadOnlyCollection<GradeItem> items)
+    {
+        return items.Average(x => x.Score);
+    }
+}
+
+public class EvaluationEngine
+{
+    private readonly IEvaluationStrategy _strategy;
+
+    public EvaluationEngine(IEvaluationStrategy strategy)
+    {
+        _strategy = strategy;
+    }
+
+    public decimal Recalculate(IReadOnlyCollection<GradeItem> items)
+    {
+        return _strategy.Calculate(items);
+    }
+}
 ```
-Компоненты UI могут зависеть от интерфейса IGradeApi, а конкретную реализацию GradeApi можно заменить (например, на мок для тестов или на другую реализацию транспорта) без изменения UI-логики, потому что контракт остаётся тем же.
+
+Если позже понадобится новый алгоритм расчета, можно добавить еще одну реализацию `IEvaluationStrategy`, не меняя `EvaluationEngine`.
+
+**L — Liskov Substitution Principle**
+
+Принцип подстановки Лисков означает, что объект производного типа должен корректно использоваться вместо базового типа.  
+В проекте это удобно показать на примере репозитория оценок.
+
+```csharp
+public interface IGradeRepository
+{
+    Task<Grade?> GetByIdAsync(Guid id);
+    Task SaveAsync(Grade grade);
+}
+
+public class PostgresGradeRepository : IGradeRepository
+{
+    public Task<Grade?> GetByIdAsync(Guid id)
+    {
+        // чтение из PostgreSQL
+        throw new NotImplementedException();
+    }
+
+    public Task SaveAsync(Grade grade)
+    {
+        // сохранение в PostgreSQL
+        throw new NotImplementedException();
+    }
+}
+
+public class InMemoryGradeRepository : IGradeRepository
+{
+    private readonly Dictionary<Guid, Grade> _storage = new();
+
+    public Task<Grade?> GetByIdAsync(Guid id)
+    {
+        _storage.TryGetValue(id, out var grade);
+        return Task.FromResult(grade);
+    }
+
+    public Task SaveAsync(Grade grade)
+    {
+        _storage[grade.Id] = grade;
+        return Task.CompletedTask;
+    }
+}
+```
+
+Обе реализации можно использовать вместо `IGradeRepository`: одна подходит для основной работы с БД, вторая — для тестирования или прототипирования. Клиентский код при этом менять не нужно.
+
+**I — Interface Segregation Principle**
+
+Принцип разделения интерфейсов означает, что клиент не должен зависеть от методов, которые ему не нужны.  
+Для системы ведомостей удобнее иметь несколько узких интерфейсов вместо одного большого.
+
+```csharp
+public interface IGradeReader
+{
+    Task<Grade?> GetByIdAsync(Guid id);
+    Task<IReadOnlyCollection<Grade>> GetByGradebookIdAsync(Guid gradebookId);
+}
+
+public interface IGradeWriter
+{
+    Task SaveAsync(Grade grade);
+}
+
+public interface IAuditWriter
+{
+    Task WriteAsync(string userId, string action, string entityId);
+}
+```
+
+Тогда, например, контроллер чтения ведомости может зависеть только от `IGradeReader`, а сервис выставления оценки — только от `IGradeWriter` и `IAuditWriter`.
+
+```csharp
+public class GradebookQueryService
+{
+    private readonly IGradeReader _gradeReader;
+
+    public GradebookQueryService(IGradeReader gradeReader)
+    {
+        _gradeReader = gradeReader;
+    }
+}
+```
+
+Такой подход делает зависимости точнее и уменьшает связанность компонентов.
+
+**D — Dependency Inversion Principle**
+
+Принцип инверсии зависимостей означает, что высокоуровневые модули должны зависеть не от конкретных реализаций, а от абстракций.  
+В сценарии выставления оценки сервис должен работать не напрямую с PostgreSQL или конкретным логгером, а с интерфейсами.
+
+```csharp
+public class UpsertGradeUseCase
+{
+    private readonly IGradeRepository _gradeRepository;
+    private readonly IEvaluationStrategy _evaluationStrategy;
+    private readonly IAuditWriter _auditWriter;
+
+    public UpsertGradeUseCase(
+        IGradeRepository gradeRepository,
+        IEvaluationStrategy evaluationStrategy,
+        IAuditWriter auditWriter)
+    {
+        _gradeRepository = gradeRepository;
+        _evaluationStrategy = evaluationStrategy;
+        _auditWriter = auditWriter;
+    }
+
+    public async Task ExecuteAsync(Grade grade, IReadOnlyCollection<GradeItem> items, string userId)
+    {
+        await _gradeRepository.SaveAsync(grade);
+
+        var finalScore = _evaluationStrategy.Calculate(items);
+
+        await _auditWriter.WriteAsync(userId, "Grade updated", grade.Id.ToString());
+    }
+}
+```
+
+Здесь `UpsertGradeUseCase` не знает, какая именно база данных используется, как именно считается итоговая оценка и куда записывается аудит.  
+Это упрощает замену реализаций и делает архитектуру гибче.
+
+Применение SOLID в системе ведения рабочих ведомостей позволяет:
+- разделить обязанности между компонентами;
+- расширять правила расчета без переписывания существующего кода;
+- заменять реализации репозиториев и сервисов без изменения клиентского кода;
+- уменьшать связанность между модулями;
+- строить более поддерживаемую и расширяемую серверную архитектуру.
 
 ## Дополнительные принципы разработки
 ### BDUF
